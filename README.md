@@ -6,6 +6,8 @@ Live: https://moatcheck.onrender.com
 
 It's not investment advice. It's a personal scoring system based on fundamentals and risk metrics, and I'm the only one adding tickers to it. If you use it, verify the numbers yourself.
 
+![MoatCheck dashboard](docs/screenshot-dashboard.png)
+
 ## What it actually does
 
 - Pulls fundamentals and price history from Alpha Vantage
