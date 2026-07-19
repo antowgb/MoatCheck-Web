@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+  @apply antialiased transition-colors duration-200;
+}
+
+* {
+  scrollbar-color: theme(colors.slate.400) transparent;
+}
+.dark * {
+  scrollbar-color: theme(colors.slate.700) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Tabular figures for dense numeric tables */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}

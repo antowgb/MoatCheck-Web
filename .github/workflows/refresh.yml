@@ -1,0 +1,36 @@
+name: Daily Refresh
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run refresh + score recompute pipeline
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/run_refresh.py
+
+      - name: Keep workflow alive
+        run: |
+          echo "$(date -u)" > .github/last_run.txt
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add .github/last_run.txt
+          git commit -m "chore: keep scheduled workflow active" || echo "No changes"
+          git push

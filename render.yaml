@@ -1,0 +1,23 @@
+services:
+  # Single service: FastAPI serves the API (/api) AND the statically exported Next.js frontend.
+  - type: web
+    name: quant-tool
+    runtime: python
+    plan: free
+    buildCommand: |
+      cd frontend && npm install && npm run build && rm -rf ../backend/static && cp -r out ../backend/static
+      cd ../backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false # enter in the Render dashboard
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false # optional — see backend/.env.example; falls back to 100% Alpha Vantage if unset
+      - key: ADMIN_API_KEY
+        sync: false # protects POST /api/stocks (X-Admin-Key header) — see .env.example to generate it
+      - key: FRONTEND_ORIGINS
+        value: http://localhost:3000 # CORS only useful in dev; in prod everything is same-origin
