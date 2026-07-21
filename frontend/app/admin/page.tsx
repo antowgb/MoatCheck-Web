@@ -3,6 +3,7 @@
 import { Check, KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import AddStockForm from "@/components/AddStockForm";
+import AdminQualitativePanels from "@/components/AdminQualitativePanels";
 import Card from "@/components/Card";
 import PageHeader from "@/components/PageHeader";
 
@@ -31,7 +32,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="max-w-lg">
+    <div className="max-w-3xl">
       <PageHeader
         title="Admin"
         subtitle="Page reserved for adding new tickers to track. The key entered below is only sent to this tool's server and stays stored only in this browser, never shared anywhere else. This isn't a real authentication system, just a barrier to keep a visitor of the public site from stumbling onto it by accident."
@@ -60,7 +61,7 @@ export default function AdminPage() {
               </span>
               <input
                 type="password"
-                className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors"
+                className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors"
                 value={adminKeyInput}
                 onChange={(e) => setAdminKeyInput(e.target.value)}
                 placeholder="Paste the ADMIN_API_KEY"
@@ -68,7 +69,7 @@ export default function AdminPage() {
             </label>
             <button
               type="submit"
-              className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
             >
               Save
             </button>
@@ -77,7 +78,10 @@ export default function AdminPage() {
       </Card>
 
       {savedKey ? (
-        <AddStockForm adminKey={savedKey} />
+        <>
+          <AddStockForm adminKey={savedKey} />
+          <AdminQualitativePanels adminKey={savedKey} />
+        </>
       ) : (
         <p className="text-sm text-slate-400 dark:text-slate-600">Enter the key above to add a ticker.</p>
       )}

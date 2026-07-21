@@ -69,6 +69,54 @@ export function backendErrorMessage(e: unknown): string {
   return raw;
 }
 
+// V2 qualitative layer — a COUNT of recent classified events, never a score.
+export interface QualitativeTally {
+  positive: number;
+  negative: number;
+  neutral: number;
+  window_days: number;
+}
+
+export type QualitativeCategory =
+  | "dated_contract"
+  | "m_and_a"
+  | "regulatory_admission"
+  | "guidance"
+  | "backlog"
+  | "governance_risk"
+  | "activist_pressure"
+  | "customer_concentration";
+export type QualitativeSentiment = "positive" | "negative" | "neutral";
+export type QualitativeSeverity = "low" | "medium" | "high";
+export type QualitativeConfidence = "high" | "medium" | "low";
+export type QualitativeSourceType = "edgar" | "ir_rss" | "newsletter" | "press";
+
+export interface QualitativeEvent {
+  id: number;
+  ticker: string;
+  category: QualitativeCategory;
+  sentiment: QualitativeSentiment;
+  severity: QualitativeSeverity;
+  confidence: QualitativeConfidence;
+  event_date: string | null;
+  source_type: QualitativeSourceType;
+  source_url: string | null;
+  summary: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface FeedStatusRow {
+  id: number;
+  ticker: string;
+  source_type: QualitativeSourceType;
+  feed_url: string | null;
+  status: "ok" | "failed" | "stale";
+  last_success_at: string | null;
+  last_error: string | null;
+  updated_at: string;
+}
+
 export interface Stock {
   ticker: string;
   name: string | null;
@@ -78,9 +126,11 @@ export interface Stock {
   status: "active" | "pending_refresh";
   asset_type: "equity" | "etf";
   sector_benchmark_ticker: string | null;
+  ir_rss_url: string | null;
   composite_score: number | null;
   computed_at: string | null;
   updated_at: string;
+  qualitative_tally?: QualitativeTally;
 }
 
 export interface ScreenerRow extends Stock {
@@ -90,6 +140,7 @@ export interface ScreenerRow extends Stock {
   market_cap: number | null;
   pe_trailing: number | null;
   debt_to_ebitda: number | null;
+  qualitative_tally?: QualitativeTally;
 }
 
 export interface ScreenerResult {
@@ -223,11 +274,46 @@ export const api = {
       headers: { "X-Admin-Key": adminKey },
       body: JSON.stringify({ ticker, asset_type: assetType }),
     }),
-  updateStock: (ticker: string, adminKey: string, body: { sector_benchmark_ticker: string | null }) =>
+  updateStock: (
+    ticker: string,
+    adminKey: string,
+    body: { sector_benchmark_ticker?: string | null; ir_rss_url?: string | null }
+  ) =>
     request<Stock>(`/stocks/${ticker}`, {
       method: "PATCH",
       headers: { "X-Admin-Key": adminKey },
       body: JSON.stringify(body),
+    }),
+  // V2 qualitative layer
+  stockQualitative: (ticker: string, params?: { category?: string; min_confidence?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.category) q.set("category", params.category);
+    if (params?.min_confidence) q.set("min_confidence", params.min_confidence);
+    const qs = q.toString();
+    return request<{ ticker: string; window_days: number; events: QualitativeEvent[] }>(
+      `/stocks/${ticker}/qualitative${qs ? `?${qs}` : ""}`
+    );
+  },
+  qualitativeTally: (ticker: string) =>
+    request<QualitativeTally>(`/qualitative/tally?ticker=${encodeURIComponent(ticker)}`),
+  qualitativeFeed: (params?: { category?: string; ticker?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.category) q.set("category", params.category);
+    if (params?.ticker) q.set("ticker", params.ticker);
+    if (params?.limit !== undefined) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return request<{ events: QualitativeEvent[]; window_days: number }>(
+      `/qualitative${qs ? `?${qs}` : ""}`
+    );
+  },
+  feedStatus: (adminKey: string, onlyProblems = false) =>
+    request<{ feeds: FeedStatusRow[] }>(`/feed-status${onlyProblems ? "?only_problems=true" : ""}`, {
+      headers: { "X-Admin-Key": adminKey },
+    }),
+  qualitativeRefresh: (adminKey: string) =>
+    request<Record<string, unknown>>("/qualitative/refresh", {
+      method: "POST",
+      headers: { "X-Admin-Key": adminKey },
     }),
   stockDetail: (ticker: string) => request<StockDetail>(`/stocks/${ticker}`),
   priceHistory: (ticker: string) => request<PricePoint[]>(`/stocks/${ticker}/history`),

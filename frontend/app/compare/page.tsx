@@ -12,7 +12,7 @@ import TickerCombobox, { type TickerComboboxOption } from "@/components/TickerCo
 import { api, type BenchmarkOption, type CompareResult, type Stock } from "@/lib/api";
 
 const inputCls =
-  "border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors";
+  "border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors";
 
 // Cycled by index across selected tickers — distinct enough at the small N
 // (a handful of tickers) this tool is meant for.
@@ -114,7 +114,7 @@ export default function ComparePage() {
           <button
             onClick={run}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
           >
             <Play size={13} />
             {loading ? "Computing…" : "Run"}

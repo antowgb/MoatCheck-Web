@@ -19,7 +19,7 @@ interface Props {
 }
 
 const inputCls =
-  "border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors";
+  "border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors";
 
 export default function TickerCombobox({
   label,
@@ -76,12 +76,12 @@ export default function TickerCombobox({
           {selected.map((t) => (
             <span
               key={t}
-              className="inline-flex items-center gap-1 text-xs font-mono bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20 rounded-md px-2 py-0.5"
+              className="inline-flex items-center gap-1 text-xs font-mono bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 rounded-md px-2 py-0.5"
             >
               {t}
               <button
                 onClick={() => onToggle(t)}
-                className="hover:text-sky-900 dark:hover:text-sky-200"
+                className="hover:text-emerald-900 dark:hover:text-emerald-200"
                 aria-label={`Remove ${t}`}
               >
                 ×

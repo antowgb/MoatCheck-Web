@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import ExportCsvButton from "./ExportCsvButton";
 import HeaderTooltip from "./HeaderTooltip";
+import { TallyBadges } from "./QualitativeBadges";
 import ScoreBadge from "./ScoreBadge";
 import type { Stock } from "@/lib/api";
 import { formatDate, isStale } from "@/lib/date";
@@ -93,6 +94,12 @@ export default function StocksTable({ stocks }: { stocks: Stock[] }) {
               {header("name", "Name")}
               {header("sector", "Sector")}
               {header("composite_score", "Composite score")}
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                <HeaderTooltip
+                  label="Recent events"
+                  tooltip="Count of AI-classified qualitative events over 90 days (positive, negative, neutral). Indicative, not a score."
+                />
+              </th>
               {header("updated_at", "Updated")}
             </tr>
           </thead>
@@ -110,7 +117,7 @@ export default function StocksTable({ stocks }: { stocks: Stock[] }) {
                 }
               >
                 <td className="px-3 py-2 font-medium font-mono">
-                  <Link href={`/stock/?ticker=${s.ticker}`} className="text-sky-600 dark:text-sky-400 hover:underline">
+                  <Link href={`/stock/?ticker=${s.ticker}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
                     {s.ticker}
                   </Link>
                 </td>
@@ -124,6 +131,9 @@ export default function StocksTable({ stocks }: { stocks: Stock[] }) {
                   ) : (
                     <ScoreBadge score={s.composite_score} />
                   )}
+                </td>
+                <td className="px-3 py-2">
+                  <TallyBadges tally={s.qualitative_tally} ticker={s.ticker} linkToTimeline />
                 </td>
                 <td className="px-3 py-2 text-sm">
                   {s.status === "pending_refresh" ? (
@@ -144,7 +154,7 @@ export default function StocksTable({ stocks }: { stocks: Stock[] }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-slate-400 dark:text-slate-600 text-sm">
+                <td colSpan={6} className="px-3 py-6 text-center text-slate-400 dark:text-slate-600 text-sm">
                   No stocks yet. Trigger a data refresh to populate the list.
                 </td>
               </tr>

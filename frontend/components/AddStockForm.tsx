@@ -72,7 +72,7 @@ export default function AddStockForm({ adminKey, onAdded }: { adminKey: string; 
       <label className="text-sm">
         <span className="block text-slate-500 dark:text-slate-400 mb-1">Add a ticker</span>
         <input
-          className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 uppercase text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors"
+          className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 uppercase text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors"
           value={ticker}
           onChange={(e) => setTicker(e.target.value)}
           placeholder="e.g. NVDA"
@@ -82,7 +82,7 @@ export default function AddStockForm({ adminKey, onAdded }: { adminKey: string; 
       <label className="text-sm">
         <span className="block text-slate-500 dark:text-slate-400 mb-1">Asset type</span>
         <select
-          className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors"
+          className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors"
           value={assetType}
           onChange={(e) => setAssetType(e.target.value as "equity" | "etf")}
         >
@@ -93,7 +93,7 @@ export default function AddStockForm({ adminKey, onAdded }: { adminKey: string; 
       <label className="text-sm">
         <span className="block text-slate-500 dark:text-slate-400 mb-1">Sector benchmark ETF</span>
         <select
-          className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors min-w-[10rem]"
+          className="border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors min-w-[10rem]"
           value={sectorBenchmark}
           onChange={(e) => setSectorBenchmark(e.target.value)}
         >
@@ -109,7 +109,7 @@ export default function AddStockForm({ adminKey, onAdded }: { adminKey: string; 
       <button
         type="submit"
         disabled={loading || !ticker.trim()}
-        className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+        className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
       >
         <Plus size={14} />
         {loading ? "Adding…" : "Add"}

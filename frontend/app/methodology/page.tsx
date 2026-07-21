@@ -19,28 +19,31 @@ export default function MethodologyPage() {
       </div>
 
       <nav className="flex flex-wrap gap-3 text-sm">
-        <a href="#composite" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#composite" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Composite score
         </a>
-        <a href="#fundamental" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#fundamental" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Fundamental score
         </a>
-        <a href="#risk" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#risk" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Risk score
         </a>
-        <a href="#correlation" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#correlation" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Correlation
         </a>
-        <a href="#weights" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#weights" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Position sizing
         </a>
-        <a href="#frontier" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#frontier" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Efficient frontier
         </a>
-        <a href="#backtest" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#backtest" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Backtest and rebalancing
         </a>
-        <a href="#limits" className="text-sky-600 dark:text-sky-400 hover:underline">
+        <a href="#qualitative" className="text-emerald-600 dark:text-emerald-400 hover:underline">
+          Qualitative tally
+        </a>
+        <a href="#limits" className="text-emerald-600 dark:text-emerald-400 hover:underline">
           Known limitations
         </a>
       </nav>
@@ -316,6 +319,43 @@ export default function MethodologyPage() {
         </p>
       </Card>
 
+      <Card title="Qualitative tally (AI-classified events)" className="scroll-mt-4" id="qualitative">
+        <p className="text-sm mb-3">
+          Alongside the quantitative scores, the tool surfaces a{" "}
+          <strong>qualitative tally</strong>: a count of recent news/filing events, classified by an AI model
+          into four categories — dated material contracts, regulatory/litigation events, technical moat
+          signals, and mergers &amp; acquisitions. Each event is tagged with a sentiment (positive / negative /
+          neutral), a severity, and a confidence level, and is shown in a chronological timeline on each stock
+          page.
+        </p>
+        <p className="text-sm mb-3">
+          The compact badge on the dashboard and screener (🟢 / 🔴 / ⚪) is a{" "}
+          <strong>count of events over the last 90 days</strong>, excluding low-confidence items from the
+          count (those stay visible in the detailed timeline).
+        </p>
+        <p className="text-sm font-medium mb-1">This tally is not a score.</p>
+        <ul className="text-sm space-y-2 text-slate-600 dark:text-slate-400">
+          <li>
+            It is a <strong>count of events</strong>, not a graded metric — three positive events aren&apos;t
+            &quot;better&quot; on any calibrated scale, they are just three events.
+          </li>
+          <li>
+            It is <strong>not backtestable</strong>: events are collected going forward, not reconstructed
+            point-in-time, so it can&apos;t be replayed historically like the composite score can.
+          </li>
+          <li>
+            It is <strong>never weighted into the composite score</strong> (nor the fundamental or risk
+            scores). The quantitative and qualitative layers are strictly separate and never fused
+            arithmetically.
+          </li>
+          <li>
+            The summaries are AI-generated and <strong>may contain extraction errors</strong> (a misread date,
+            a misclassified event). Always verify against the linked <code>source</code> before acting on
+            anything.
+          </li>
+        </ul>
+      </Card>
+
       <Card title="Known limitations" className="scroll-mt-4" id="limits">
         <ul className="text-sm space-y-3">
           <li>
@@ -338,11 +378,15 @@ export default function MethodologyPage() {
             verified case by case.
           </li>
           <li>
-            <strong>No qualitative layer.</strong> The tool models neither the strength of a
-            competitive advantage ("moat"), nor management quality, nor
-            regulatory, legal, or sector-specific risks for a company: only
-            figures extracted from financial statements and prices are used. Qualitative
-            analysis may be added in the future, but it isn&apos;t used today.
+            <strong>The score itself has no qualitative input.</strong> The composite, fundamental, and risk
+            scores model neither the strength of a competitive advantage (&quot;moat&quot;), nor management
+            quality, nor regulatory or legal risk: only figures from financial statements and prices feed the
+            scores. The separate{" "}
+            <a href="#qualitative" className="text-emerald-600 dark:text-emerald-400 hover:underline">
+              qualitative tally
+            </a>{" "}
+            adds an AI-classified event feed alongside the scores, but is a display-only count and is never
+            mixed into any score.
           </li>
           <li>
             <strong>Not a trading tool.</strong> No short-term buy/sell signal,
@@ -373,7 +417,7 @@ export default function MethodologyPage() {
         time as the methodology evolves.
       </p>
 
-      <Link href="/" className="text-sm text-sky-600 dark:text-sky-400 hover:underline inline-block">
+      <Link href="/" className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline inline-block">
         &larr; Back to dashboard
       </Link>
     </div>

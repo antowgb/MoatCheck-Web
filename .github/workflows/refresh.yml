@@ -1,8 +1,13 @@
 name: Daily Refresh
 on:
-  schedule:
-    - cron: '0 6 * * *'
   workflow_dispatch:
+  schedule:
+    # 01:00 UTC = 02:00 Paris (winter, CET) / 03:00 Paris (summer, CEST).
+    # GitHub Actions cron is fixed UTC — it does not observe timezones or DST,
+    # so the Paris-local trigger time drifts by an hour across the year; this
+    # is expected, not a bug. Applies to BOTH jobs below (refresh + qualitative)
+    # since this `on:` is workflow-level, not scoped to a single job.
+    - cron: '0 1 * * *'
 
 jobs:
   refresh:
@@ -34,3 +39,27 @@ jobs:
           git add .github/last_run.txt
           git commit -m "chore: keep scheduled workflow active" || echo "No changes"
           git push
+
+  # V2 qualitative layer — runs in PARALLEL with the Alpha Vantage refresh
+  # above (separate job, no dependency between them). Only sources enabled in
+  # app/qualitative/config.py::SOURCE_FLAGS actually run (EDGAR only, default).
+  qualitative:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run qualitative refresh pipeline
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          EDGAR_CONTACT_EMAIL: ${{ secrets.EDGAR_CONTACT_EMAIL }}
+        run: python scripts/run_qualitative.py

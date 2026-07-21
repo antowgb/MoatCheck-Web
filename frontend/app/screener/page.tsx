@@ -11,6 +11,7 @@ import Disclaimer from "@/components/Disclaimer";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import HeaderTooltip from "@/components/HeaderTooltip";
 import PageHeader from "@/components/PageHeader";
+import { TallyBadges } from "@/components/QualitativeBadges";
 import ScoreBadge from "@/components/ScoreBadge";
 import Skeleton from "@/components/Skeleton";
 import { api, backendErrorMessage, type CorrelationResult, type ScreenerRow } from "@/lib/api";
@@ -41,7 +42,7 @@ const TICKER_SECTOR_TOOLTIPS: Record<"ticker" | "sector", string> = {
 };
 
 const inputCls =
-  "border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 dark:focus:border-sky-500 transition-colors";
+  "border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 dark:focus:border-emerald-500 transition-colors";
 
 function fmtPct(v: number | null): string {
   return v != null ? `${(v * 100).toFixed(1)} %` : "N/A";
@@ -325,7 +326,7 @@ function ScreenerView() {
           </label>
           <button
             onClick={() => applyFilters(filters)}
-            className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
           >
             Filter
           </button>
@@ -364,7 +365,7 @@ function ScreenerView() {
           <button
             onClick={handleCompareCorrelation}
             disabled={selectedTickers.size < 2 || correlationLoading}
-            className="bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
           >
             {correlationLoading ? "Comparing…" : "Compare correlation"}
           </button>
@@ -415,6 +416,12 @@ function ScreenerView() {
                     </span>
                   </th>
                 ))}
+                <th className="px-3 py-2">
+                  <HeaderTooltip
+                    label="Events"
+                    tooltip="Count of AI-classified qualitative events over 90 days (positive, negative, neutral). Indicative, not a score, not sortable."
+                  />
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -436,12 +443,12 @@ function ScreenerView() {
                       />
                     </td>
                     <td className="px-3 py-2 font-medium font-mono">
-                      <Link href={`/stock/?ticker=${r.ticker}`} className="text-sky-600 dark:text-sky-400 hover:underline">
+                      <Link href={`/stock/?ticker=${r.ticker}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
                         {r.ticker}
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">{r.sector ?? "N/A"}</td>
-                    <td className="px-3 py-2" colSpan={SORT_COLUMNS.length}>
+                    <td className="px-3 py-2" colSpan={SORT_COLUMNS.length + 1}>
                       <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400">
                         Data pending
                       </span>
@@ -464,7 +471,7 @@ function ScreenerView() {
                       />
                     </td>
                     <td className="px-3 py-2 font-medium font-mono">
-                      <Link href={`/stock/?ticker=${r.ticker}`} className="text-sky-600 dark:text-sky-400 hover:underline">
+                      <Link href={`/stock/?ticker=${r.ticker}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
                         {r.ticker}
                       </Link>
                     </td>
@@ -490,12 +497,15 @@ function ScreenerView() {
                     <td className="px-3 py-2 text-sm font-mono text-slate-700 dark:text-slate-300">
                       {fmtNum(r.debt_to_ebitda)}
                     </td>
+                    <td className="px-3 py-2">
+                      <TallyBadges tally={r.qualitative_tally} ticker={r.ticker} linkToTimeline />
+                    </td>
                   </motion.tr>
                 )
               )}
               {sortedRows.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-6 text-center text-slate-400 dark:text-slate-600 text-sm">
+                  <td colSpan={11} className="px-3 py-6 text-center text-slate-400 dark:text-slate-600 text-sm">
                     No results.
                   </td>
                 </tr>

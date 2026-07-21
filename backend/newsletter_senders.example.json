@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this to the path in NEWSLETTER_SENDERS_FILE (default: qualitative_cache/newsletter_senders.json) and fill in the sender addresses of the newsletters you want scanned. Only emails FROM these addresses are read. The 'newsletter' source is disabled by default (see app/qualitative/config.py SOURCE_FLAGS) — enable it only after this list is populated and Gmail OAuth is set up (see GMAIL_SETUP.md).",
+  "senders": [
+    "example-newsletter@substack.com",
+    "research@example-broker.com"
+  ]
+}

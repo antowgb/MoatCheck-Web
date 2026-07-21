@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
 
 import pandas as pd
@@ -14,6 +14,8 @@ from app.backtest.compare import run_compare
 from app.backtest.engine import _load_closes, earliest_price_date, run_backtest
 from app.data.fetch import refresh_due, refresh_tickers
 from app.data.supabase_client import RETRYABLE_EXC, execute_with_retry, get_supabase
+from app.qualitative import config as qual_config
+from app.qualitative.run import run_qualitative_refresh
 from app.scoring.composite import composite_score
 from app.scoring.fundamentals import fundamental_score
 from app.scoring.portfolio import efficient_frontier, inverse_volatility_weights
@@ -103,6 +105,11 @@ class AddStockRequest(BaseModel):
 
 class UpdateStockRequest(BaseModel):
     sector_benchmark_ticker: str | None = Field(default=None, max_length=10)
+    # V2 qualitative layer: IR RSS feed URL, curated manually via /admin.
+    # Sentinel-less optional: absent => field untouched; explicit null => cleared.
+    # Uses a Field flag pattern below via model_fields_set to distinguish
+    # "not provided" from "provided as null".
+    ir_rss_url: str | None = Field(default=None, max_length=500)
 
 
 # --- Helpers -----------------------------------------------------------------
@@ -174,6 +181,58 @@ def _latest_fundamentals(ticker: str) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
+# --- Qualitative layer (V2) --------------------------------------------------
+# Strictly separate from scoring: these helpers only COUNT classified events,
+# never feed composite_score/fundamental_score/risk_score.
+
+def _tally_window_cutoff() -> str:
+    """ISO date TALLY_WINDOW_DAYS ago — the start of the rolling tally window."""
+    return (date.today() - timedelta(days=qual_config.TALLY_WINDOW_DAYS)).isoformat()
+
+
+def _empty_tally() -> dict[str, Any]:
+    return {"positive": 0, "negative": 0, "neutral": 0, "window_days": qual_config.TALLY_WINDOW_DAYS}
+
+
+def _qualitative_tally_by_ticker(tickers: list[str]) -> dict[str, dict[str, Any]]:
+    """Sentiment counts over the tally window per ticker, in one round-trip.
+
+    Windowing uses event_date, falling back to created_at when event_date is
+    NULL (some sources don't yield an extractable date). Low-confidence events
+    (TALLY_EXCLUDE_CONFIDENCE) are excluded from the COUNT but stay visible in
+    the detailed timeline (GET /api/stocks/{ticker}/qualitative). Batched like
+    _latest_scores_by_ticker — no N+1.
+    """
+    if not tickers:
+        return {}
+    cutoff = _tally_window_cutoff()
+    try:
+        rows = _execute_with_retry(
+            get_supabase().table("qualitative_notes")
+            .select("ticker, sentiment, confidence, event_date, created_at")
+            .in_("ticker", tickers)
+            .neq("confidence", qual_config.TALLY_EXCLUDE_CONFIDENCE),
+            context=f"tally {len(tickers)} tickers",
+        ).data
+    except Exception:
+        logger.error("Failed to load qualitative tally for %s tickers.", len(tickers), exc_info=True)
+        return {}
+
+    tally: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        # Effective date for the window: event_date, else the created_at date.
+        eff = row.get("event_date") or (row.get("created_at") or "")[:10]
+        if not eff or eff < cutoff:
+            continue
+        sentiment = row.get("sentiment")
+        if sentiment not in qual_config.SENTIMENTS:
+            continue
+        t = row["ticker"]
+        bucket = tally.setdefault(t, _empty_tally())
+        bucket[sentiment] += 1
+    return tally
+
+
 # --- Endpoints ---------------------------------------------------------------
 
 @router.get("/stocks/benchmarks")
@@ -198,11 +257,15 @@ def list_stocks() -> list[dict[str, Any]]:
     stocks = _execute_with_retry(
         sb.table("stocks").select("*").eq("is_benchmark", False).neq("asset_type", "etf").order("ticker")
     ).data
-    scores = _latest_scores_by_ticker([s["ticker"] for s in stocks])
+    tickers = [s["ticker"] for s in stocks]
+    scores = _latest_scores_by_ticker(tickers)
+    tally = _qualitative_tally_by_ticker(tickers)  # V2: additive, display-only
     for s in stocks:
         score = scores.get(s["ticker"])
         s["composite_score"] = score["composite_score"] if score else None
         s["computed_at"] = score["computed_at"] if score else None
+        # qualitative_tally is a COUNT of recent events, never mixed into any score.
+        s["qualitative_tally"] = tally.get(s["ticker"], _empty_tally())
     return stocks
 
 
@@ -249,7 +312,12 @@ def add_stock(body: AddStockRequest) -> dict[str, Any]:
 
 @router.patch("/stocks/{ticker}", dependencies=[Depends(_require_admin)])
 def update_stock(ticker: str, body: UpdateStockRequest) -> dict[str, Any]:
-    """Sets sector_benchmark_ticker on an existing stock (admin-only)."""
+    """Updates sector_benchmark_ticker and/or ir_rss_url on a stock (admin-only).
+
+    Only the fields explicitly present in the request body are touched (a PATCH
+    that omits a field leaves it unchanged), so the two curation flows (backtest
+    benchmark, IR feed URL) don't clobber each other.
+    """
     sb = get_supabase()
     ticker = ticker.upper().strip()
 
@@ -259,23 +327,31 @@ def update_stock(ticker: str, body: UpdateStockRequest) -> dict[str, Any]:
     if not existing:
         raise HTTPException(404, f"Unknown ticker {ticker}.")
 
-    if body.sector_benchmark_ticker is not None:
-        benchmark_ticker = body.sector_benchmark_ticker.upper().strip()
-        benchmark = _execute_with_retry(
-            sb.table("stocks").select("ticker").eq("ticker", benchmark_ticker), context=benchmark_ticker
-        ).data
-        if not benchmark:
-            raise HTTPException(422, f"sector_benchmark_ticker {benchmark_ticker} does not exist in stocks.")
-    else:
-        benchmark_ticker = None
+    update: dict[str, Any] = {}
 
-    _execute_with_retry(
-        sb.table("stocks")
-        .update({"sector_benchmark_ticker": benchmark_ticker, "updated_at": datetime.now(timezone.utc).isoformat()})
-        .eq("ticker", ticker),
-        context=ticker,
-    )
-    return {"ticker": ticker, "sector_benchmark_ticker": benchmark_ticker}
+    if "sector_benchmark_ticker" in body.model_fields_set:
+        if body.sector_benchmark_ticker is not None:
+            benchmark_ticker = body.sector_benchmark_ticker.upper().strip()
+            benchmark = _execute_with_retry(
+                sb.table("stocks").select("ticker").eq("ticker", benchmark_ticker), context=benchmark_ticker
+            ).data
+            if not benchmark:
+                raise HTTPException(422, f"sector_benchmark_ticker {benchmark_ticker} does not exist in stocks.")
+        else:
+            benchmark_ticker = None
+        update["sector_benchmark_ticker"] = benchmark_ticker
+
+    if "ir_rss_url" in body.model_fields_set:
+        # Empty string is normalized to NULL (no feed), never stored as "".
+        url = (body.ir_rss_url or "").strip()
+        update["ir_rss_url"] = url or None
+
+    if not update:
+        raise HTTPException(422, "No updatable field provided (sector_benchmark_ticker, ir_rss_url).")
+
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    _execute_with_retry(sb.table("stocks").update(update).eq("ticker", ticker), context=ticker)
+    return {"ticker": ticker, **{k: v for k, v in update.items() if k != "updated_at"}}
 
 
 @router.get("/stocks/{ticker}")
@@ -401,6 +477,7 @@ def screener(
         .neq("asset_type", "etf")
         .eq("status", "active")
     ).data
+    tally = _qualitative_tally_by_ticker([s["ticker"] for s in stocks])  # V2: display-only
     rows: list[dict[str, Any]] = []
     for s in stocks:
         if sector and (s.get("sector") or "").strip().casefold() != sector.strip().casefold():
@@ -440,6 +517,7 @@ def screener(
                 "market_cap": market_cap,
                 "pe_trailing": pe_trailing,
                 "debt_to_ebitda": debt_to_ebitda,
+                "qualitative_tally": tally.get(s["ticker"], _empty_tally()),
             }
         )
     rows.sort(key=lambda r: (r["composite_score"] is None, -(r["composite_score"] or 0)))
@@ -606,3 +684,107 @@ def portfolio_efficient_frontier(
     if "error" in result:
         raise HTTPException(422, result["error"])
     return result
+
+
+# --- Qualitative layer endpoints (V2) ----------------------------------------
+# All read endpoints are additive and display-only. The tally is a COUNT, never
+# a score, and is never fed into composite_score/fundamental_score/risk_score.
+
+_CONFIDENCE_RANK = {"low": 0, "medium": 1, "high": 2}
+
+
+@router.post("/qualitative/refresh", dependencies=[Depends(_require_admin)])
+def qualitative_refresh() -> dict[str, Any]:
+    """Runs the qualitative collect->classify->write pipeline (admin-only).
+
+    Same protection pattern as POST /api/refresh. Only sources enabled in
+    app.qualitative.config.SOURCE_FLAGS actually run (EDGAR only, by default).
+    """
+    return run_qualitative_refresh()
+
+
+@router.get("/stocks/{ticker}/qualitative")
+def stock_qualitative(
+    ticker: str,
+    category: str | None = Query(default=None, description="Filter to one category."),
+    min_confidence: str | None = Query(
+        default=None, description="Minimum confidence: low | medium | high."
+    ),
+) -> dict[str, Any]:
+    """Qualitative events for a ticker, most recent first (event_date DESC).
+
+    Low-confidence events ARE included here (they're filtered only from the
+    tally count); use min_confidence to narrow the timeline explicitly.
+    """
+    ticker = ticker.upper()
+    if category is not None and category not in qual_config.CATEGORIES:
+        raise HTTPException(422, f"Unknown category {category!r}. Allowed: {', '.join(qual_config.CATEGORIES)}.")
+    if min_confidence is not None and min_confidence not in qual_config.CONFIDENCES:
+        raise HTTPException(422, f"Unknown confidence {min_confidence!r}. Allowed: {', '.join(qual_config.CONFIDENCES)}.")
+
+    sb = get_supabase()
+    query = (
+        sb.table("qualitative_notes")
+        .select("id, ticker, category, sentiment, severity, confidence, event_date, "
+                "source_type, source_url, summary, note, created_at")
+        .eq("ticker", ticker)
+    )
+    if category is not None:
+        query = query.eq("category", category)
+    # event_date can be NULL (no extractable date); nullslast keeps those at the
+    # bottom rather than dropping them or floating them to the top.
+    query = query.order("event_date", desc=True, nullsfirst=False).order("created_at", desc=True)
+    rows = _execute_with_retry(query, context=ticker).data
+
+    if min_confidence is not None:
+        floor = _CONFIDENCE_RANK[min_confidence]
+        rows = [r for r in rows if _CONFIDENCE_RANK.get(r.get("confidence"), -1) >= floor]
+
+    return {"ticker": ticker, "window_days": qual_config.TALLY_WINDOW_DAYS, "events": rows}
+
+
+@router.get("/qualitative/tally")
+def qualitative_tally(ticker: str = Query(..., description="Ticker to tally.")) -> dict[str, Any]:
+    """On-the-fly sentiment tally over the rolling window for one ticker.
+
+    Not stored — computed at request time. Excludes low-confidence events from
+    the count (they remain visible in the detailed timeline).
+    """
+    ticker = ticker.upper()
+    return _qualitative_tally_by_ticker([ticker]).get(ticker, _empty_tally())
+
+
+@router.get("/qualitative")
+def qualitative_feed(
+    category: str | None = Query(default=None),
+    ticker: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict[str, Any]:
+    """Global cross-ticker feed, most recent event first — powers /qualitatif."""
+    if category is not None and category not in qual_config.CATEGORIES:
+        raise HTTPException(422, f"Unknown category {category!r}. Allowed: {', '.join(qual_config.CATEGORIES)}.")
+    sb = get_supabase()
+    query = sb.table("qualitative_notes").select(
+        "id, ticker, category, sentiment, severity, confidence, event_date, "
+        "source_type, source_url, summary, created_at"
+    )
+    if category is not None:
+        query = query.eq("category", category)
+    if ticker is not None:
+        query = query.eq("ticker", ticker.upper())
+    query = query.order("event_date", desc=True, nullsfirst=False).order("created_at", desc=True).limit(limit)
+    rows = _execute_with_retry(query, context="qualitative feed").data
+    return {"events": rows, "window_days": qual_config.TALLY_WINDOW_DAYS}
+
+
+@router.get("/feed-status", dependencies=[Depends(_require_admin)])
+def feed_status(
+    only_problems: bool = Query(default=False, description="If true, only failed/stale feeds."),
+) -> dict[str, Any]:
+    """Per-(ticker, source) feed reliability, for the /admin monitor (admin-only)."""
+    sb = get_supabase()
+    query = sb.table("feed_status").select("*").order("updated_at", desc=True)
+    if only_problems:
+        query = query.in_("status", ["failed", "stale"])
+    rows = _execute_with_retry(query, context="feed_status").data
+    return {"feeds": rows}

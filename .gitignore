@@ -17,3 +17,9 @@ frontend/tsconfig.tsbuildinfo
 .DS_Store
 refresh_progress.json
 backend/raw_indicators.csv
+
+# V2 qualitative layer — local cache + secrets/tokens (never commit)
+backend/qualitative_cache/
+backend/gmail_credentials.json
+backend/gmail_token.json
+backend/groq_progress.json

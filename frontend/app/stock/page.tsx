@@ -8,9 +8,10 @@ import Card from "@/components/Card";
 import Disclaimer from "@/components/Disclaimer";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import PriceChart from "@/components/PriceChart";
+import { QualitativeEventItem } from "@/components/QualitativeBadges";
 import ScoreBadge from "@/components/ScoreBadge";
 import Skeleton from "@/components/Skeleton";
-import { api, type PricePoint, type StockDetail } from "@/lib/api";
+import { api, type PricePoint, type QualitativeEvent, type StockDetail } from "@/lib/api";
 import { formatDate, isStale } from "@/lib/date";
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -50,12 +51,19 @@ function StockDetailView() {
   const ticker = useSearchParams().get("ticker")?.toUpperCase() ?? "";
   const [detail, setDetail] = useState<StockDetail | null>(null);
   const [history, setHistory] = useState<PricePoint[]>([]);
+  const [qualitative, setQualitative] = useState<QualitativeEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ticker) return;
     api.stockDetail(ticker).then(setDetail).catch((e) => setError(String(e)));
     api.priceHistory(ticker).then(setHistory).catch(() => {});
+    // Qualitative timeline is additive/best-effort: a failure here never blocks
+    // the rest of the page (empty timeline is rendered explicitly).
+    api
+      .stockQualitative(ticker)
+      .then((r) => setQualitative(r.events))
+      .catch(() => setQualitative([]));
   }, [ticker]);
 
   if (!ticker)
@@ -144,7 +152,7 @@ function StockDetailView() {
           </p>
           <Link
             href="/methodology#composite"
-            className="text-xs text-sky-600 dark:text-sky-400 hover:underline mt-2 inline-block"
+            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-2 inline-block"
           >
             How is this score calculated?
           </Link>
@@ -187,6 +195,30 @@ function StockDetailView() {
           </>
         ) : (
           <p className="text-sm text-slate-400 dark:text-slate-600">No price history.</p>
+        )}
+      </Card>
+
+      <Card title="Qualitative signals" id="qualitative" className="scroll-mt-4">
+        <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">
+          Recent AI-classified events (contracts, regulatory, technical moat, M&amp;A). This is an indicative{" "}
+          <strong>count, not a score</strong>, and is not weighted into the composite. Summaries may contain
+          extraction errors. Always verify against the source.{" "}
+          <Link href="/methodology#qualitative" className="text-emerald-600 dark:text-emerald-400 hover:underline">
+            Learn more
+          </Link>
+        </p>
+        {qualitative === null ? (
+          <Skeleton className="h-24" />
+        ) : qualitative.length === 0 ? (
+          <p className="text-sm text-slate-400 dark:text-slate-600">
+            No qualitative events detected for this ticker.
+          </p>
+        ) : (
+          <ul className="mt-1">
+            {qualitative.map((ev) => (
+              <QualitativeEventItem key={ev.id} event={ev} />
+            ))}
+          </ul>
         )}
       </Card>
 
