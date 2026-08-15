@@ -296,18 +296,18 @@ PRESS_MAX_ITEMS_PER_TICKER_PER_RUN = 5
 # --- Groq classification ----------------------------------------------------
 # Free-tier limits are PER MODEL and change over time; VERIFY at
 # https://console.groq.com/docs/rate-limits before editing. The defaults below
-# target llama-3.3-70b-versatile on the free tier (as of writing):
-#   30 RPM · 1,000 RPD · 12,000 TPM · 100,000 TPD.
+# target openai/gpt-oss-120b on the free tier (as of August 2026):
+#   30 RPM · 1,000 RPD · 8,000 TPM · 200,000 TPD.
 # All four are enforced (not just RPM): the effective ceiling for our request
 # size is actually TPM, not RPM (see GROQ_THROTTLE_SECONDS below), and the
 # daily RPD/TPD are hard-stopped via a persistent tracker so a single buggy
 # run can't burn the whole day's quota.
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
 GROQ_MAX_REQUESTS_PER_MINUTE = 30
 GROQ_MAX_REQUESTS_PER_DAY = 1000
-GROQ_MAX_TOKENS_PER_MINUTE = 12_000
-GROQ_MAX_TOKENS_PER_DAY = 100_000
+GROQ_MAX_TOKENS_PER_MINUTE = 8_000
+GROQ_MAX_TOKENS_PER_DAY = 200_000
 # Stay safely under each ceiling — free-tier accounting isn't exact and
 # concurrent/other same-day runs share the quota.
 GROQ_QUOTA_SAFETY_FRACTION = 0.9
