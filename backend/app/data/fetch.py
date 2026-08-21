@@ -177,7 +177,13 @@ class _AlphaVantageClient:
                         ticker, endpoint)
             return cached
 
-        query = {"function": endpoint, "symbol": ticker,
+        # Alpha Vantage's own symbol convention hyphenates share classes
+        # (e.g. Berkshire's B shares are "BRK-B", not "BRK.B") — our
+        # internal ticker keeps the dot (the exchange-standard form used
+        # everywhere else: DB rows, UI, other data sources), only the
+        # literal API request is translated, so nothing else needs to know.
+        av_symbol = ticker.replace(".", "-")
+        query = {"function": endpoint, "symbol": av_symbol,
                  "apikey": _require_api_key(), **params}
         url = f"{_API_URL}?{urllib.parse.urlencode(query)}"
 

@@ -5,11 +5,41 @@ on:
     # 01:00 UTC = 02:00 Paris (winter, CET) / 03:00 Paris (summer, CEST).
     # GitHub Actions cron is fixed UTC — it does not observe timezones or DST,
     # so the Paris-local trigger time drifts by an hour across the year; this
-    # is expected, not a bug. Applies to BOTH jobs below (refresh + qualitative)
-    # since this `on:` is workflow-level, not scoped to a single job.
-    - cron: '0 1 * * *'
+    # is expected, not a bug.
+    #
+    # Weekdays only (1-5): the universe is US + ADR equities, whose
+    # fundamentals and 8-K/6-K filings do not move while the markets are
+    # closed. Two skipped days per week cut this workflow's billed minutes by
+    # ~29% for no loss of freshness.
+    - cron: '0 1 * * 1-5'
+
+# The "Keep workflow alive" step below commits back to the repo (so GitHub
+# doesn't auto-disable the cron after 60 days of no commits) — the default
+# GITHUB_TOKEN is read-only unless this is declared explicitly.
+permissions:
+  contents: write
+
+# THIS REPO IS THE SOLE DAILY WRITER of the shared Supabase project
+# (hxeskxwhmzcoppminamf). MoatCheck-Mobile points at the SAME project and used
+# to run an identical refresh + qualitative cron every night, duplicating every
+# Alpha Vantage call and every Groq classification for nothing; its schedule is
+# now removed (manual dispatch only).
+#
+# That makes this workflow responsible for BOTH consumers of the database:
+#   - the web app, whose Render service reads it live via the anon key;
+#   - the mobile app, which reads NOTHING live and depends entirely on the
+#     static JSON that the export step below pushes to the public Storage
+#     bucket (see MoatCheck-Mobile/mobile/lib/dataSource.ts).
+# Removing or breaking the export step therefore silently freezes the mobile
+# app's data, with no error surfaced on the web side.
 
 jobs:
+  # Single job on purpose. `refresh` and `qualitative` used to be two separate
+  # jobs running in parallel, which saved wall-clock but NOT billed minutes —
+  # Actions bills the sum of per-job minutes, each job rounded up to the next
+  # minute, and each one repaid its own checkout + setup-python + pip install
+  # (~2 min of pure overhead). Sequential in one job is strictly cheaper for
+  # the same work.
   refresh:
     runs-on: ubuntu-latest
     steps:
@@ -18,11 +48,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          # requirements.txt pulls pandas/numpy/scipy/yfinance/google-api-*.
+          # Uncached, that install cost ~60-90s on every single run.
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      # `continue-on-error` on the two pipeline steps below preserves what the
+      # old multi-job layout got from `if: ${{ !cancelled() }}` on its export
+      # job: run_refresh.py exits non-zero on ANY single ticker failure (e.g.
+      # one bad Alpha Vantage response), even when most tickers scored fine.
+      # Without this, such a partial, non-fatal failure would skip the export
+      # and leave the mobile app's bucket stale. The real outcome is
+      # re-surfaced by the final step, so the run still shows as failed.
       - name: Run refresh + score recompute pipeline
+        id: refresh
+        continue-on-error: true
         working-directory: backend
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -31,7 +74,35 @@ jobs:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python scripts/run_refresh.py
 
+      # V2 qualitative layer. Only sources enabled in
+      # app/qualitative/config.py::SOURCE_FLAGS actually run (edgar + press).
+      - name: Run qualitative refresh pipeline
+        id: qualitative
+        continue-on-error: true
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          EDGAR_CONTACT_EMAIL: ${{ secrets.EDGAR_CONTACT_EMAIL }}
+        run: python scripts/run_qualitative.py
+
+      # Publishes the current Supabase state as static JSON in the public
+      # Storage bucket the MOBILE app reads. Ported here from
+      # MoatCheck-Mobile when this repo took over the schedule — the mobile
+      # app has no live backend, so this step is its only data path.
+      - name: Export JSON to public Storage bucket
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/export_json.py
+
+      # `if: always()` so a failing pipeline can't stop the keep-alive commit:
+      # 60 consecutive days of failures would otherwise let GitHub disable the
+      # schedule silently, which is exactly when you still want it running.
       - name: Keep workflow alive
+        if: always()
         run: |
           echo "$(date -u)" > .github/last_run.txt
           git config user.email "action@github.com"
@@ -40,26 +111,10 @@ jobs:
           git commit -m "chore: keep scheduled workflow active" || echo "No changes"
           git push
 
-  # V2 qualitative layer — runs in PARALLEL with the Alpha Vantage refresh
-  # above (separate job, no dependency between them). Only sources enabled in
-  # app/qualitative/config.py::SOURCE_FLAGS actually run (EDGAR only, default).
-  qualitative:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
-
-      - name: Run qualitative refresh pipeline
-        working-directory: backend
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          EDGAR_CONTACT_EMAIL: ${{ secrets.EDGAR_CONTACT_EMAIL }}
-        run: python scripts/run_qualitative.py
+      - name: Surface pipeline failures
+        if: steps.refresh.outcome == 'failure' || steps.qualitative.outcome == 'failure'
+        run: |
+          echo "refresh=${{ steps.refresh.outcome }}"
+          echo "qualitative=${{ steps.qualitative.outcome }}"
+          echo "The export above still published whatever Supabase currently holds."
+          exit 1
