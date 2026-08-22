@@ -1,5 +1,9 @@
 # MoatCheck
 
+MoatCheck is a personal, open-source research tool for studying the durability of a company's competitive advantages. It brings public filings, financial data, risk measures and a structured qualitative checklist into one place. It is not investment advice and it does not produce buy or sell recommendations.
+
+[Use the live app](https://moatcheck.onrender.com) · [Read the methodology](https://weissgerber.dev/products/moatcheck/methodology) · [About the product](https://weissgerber.dev/products/moatcheck/)
+
 I'm a student, and this is a tool I built for myself to pick stocks for my own long-term portfolio (10-15 years, DCA). I mostly built it to actually learn quant finance by doing it, instead of just reading about ratios and backtests. It's also genuinely how I check my own portfolio now.
 
 Live: https://moatcheck.onrender.com
@@ -102,4 +106,4 @@ Honestly, mostly to learn. I wanted to actually understand what ROE, Sharpe rati
 
 I used Claude Code for a good chunk of the implementation (FastAPI boilerplate, Next.js plumbing, deployment config). The part I actually wanted to learn was the quant finance side, not fighting with Supabase RLS policies or Next.js static export quirks, so I leaned on it for that and spent my time on the scoring logic, the backtest, and understanding why things like know_date or 52-vs-252 periods actually matter. I reviewed and fixed the logic myself along the way, but I won't pretend the boilerplate is all hand-typed.
 
-If you find it useful or want to poke around the code, feel free. And if you want to support it, I take sponsors: https://github.com/sponsors/[your-username]
+If you find it useful or want to poke around the code, feel free.
