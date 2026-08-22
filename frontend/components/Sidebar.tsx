@@ -49,7 +49,14 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="flex items-center justify-between px-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-        <span className="text-xs text-slate-400 dark:text-slate-600">V2</span>
+        <a
+          href="https://weissgerber.dev/products/moatcheck/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-400"
+        >
+          About MoatCheck
+        </a>
         <ThemeToggle />
       </div>
     </aside>
